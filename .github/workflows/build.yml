@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - run: pyinstaller --noconfirm khorbros.spec
+
+      - name: Stage Mac bundle
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p KhorBrosMenu-Mac
+          cp dist/KhorBrosMenu KhorBrosMenu-Mac/
+          cp launch.command KhorBrosMenu-Mac/"Launch Menu Maker.command"
+          cp BOSS_README.txt KhorBrosMenu-Mac/
+          chmod +x KhorBrosMenu-Mac/KhorBrosMenu
+          chmod +x KhorBrosMenu-Mac/"Launch Menu Maker.command"
+          # ditto preserves Unix permissions when the boss extracts on macOS.
+          ditto -ck --sequesterRsrc --keepParent KhorBrosMenu-Mac KhorBrosMenu-Mac.zip
+
+      - name: Stage Windows bundle
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory KhorBrosMenu-Windows | Out-Null
+          Copy-Item dist/KhorBrosMenu.exe KhorBrosMenu-Windows/
+          Copy-Item launch.bat KhorBrosMenu-Windows/"Launch Menu Maker.bat"
+          Copy-Item BOSS_README.txt KhorBrosMenu-Windows/
+          Compress-Archive -Path KhorBrosMenu-Windows/* -DestinationPath KhorBrosMenu-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KhorBrosMenu-${{ runner.os }}
+          path: |
+            KhorBrosMenu-Mac.zip
+            KhorBrosMenu-Windows.zip
+          if-no-files-found: ignore
