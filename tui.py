@@ -41,19 +41,26 @@ def checkbox(prompt, choices):
 
     cursor = 0
     marked = [False] * len(choices)
-    sys.stdout.write("\x1b[?25l\x1b[s")  # hide cursor, save position
+    prev_lines = 0
+    sys.stdout.write("\x1b[?25l")  # hide cursor
     try:
         while True:
-            sys.stdout.write("\x1b[u\x1b[J")  # restore + clear below
-            print(prompt)
-            print()
+            lines = [prompt, ""]
             for i, name in enumerate(choices):
                 pointer = ">" if i == cursor else " "
                 box = "[x]" if marked[i] else "[ ]"
-                print(f" {pointer} {box} {name}")
-            print()
-            print(" Up/Down: move   Space: toggle   Enter: confirm   Q: cancel")
+                lines.append(f" {pointer} {box} {name}")
+            lines.append("")
+            lines.append(" Up/Down: move   Space: toggle   Enter: confirm   Q: cancel")
+
+            # Move to the start of the previous frame and clear to end of screen.
+            # Counted-up redraw avoids the broken \x1b[s/\x1b[u save/restore behavior
+            # in macOS Terminal and Windows Console when the first render scrolls.
+            if prev_lines:
+                sys.stdout.write(f"\x1b[{prev_lines}F\x1b[0J")
+            sys.stdout.write("\n".join(lines) + "\n")
             sys.stdout.flush()
+            prev_lines = len(lines)
 
             key = _read_key()
             if key == "up":
